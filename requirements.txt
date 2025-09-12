@@ -1,0 +1,9 @@
+transformers
+torch
+accelerate
+diskcache
+sentencepiece
+streamlit
+sentence-transformers
+faiss-cpu
+redis
