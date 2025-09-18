@@ -14,14 +14,18 @@ import cx_Oracle
 
 from gmigrate_streamlit.tools.caching_tools import get_cached_response, get_prompt_hash, save_response_to_cache
 from gmigrate_streamlit.tools.connect_db import connect_oracle, connect_snowflake
-from gmigrate_streamlit.tools.snowflake_ddl_loader import load_ddl_snowflake
+from gmigrate_streamlit.tools.snowflake_ddl_loader import load_ddl_data_snowflake, load_ddl_snowflake
 curr_time = datetime.now(ZoneInfo("Asia/Kolkata"))
 curr_time = curr_time.strftime("%Y-%m-%d %H:%M:%S")
 
 from gmigrate_streamlit.crew import GmigrateStreamlit
 from gmigrate_streamlit.tools.oracle_ddl_extraction import getOracleFunctionDDL, getOracleProcedureDDL, getOracleTableDDL, getOracleViewDDL
 
-warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd") 
+warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
+
+# def get_user_prompt(purpose):
+#     return str(source)+str(target)+str(object_type)+str(ddl)+str(schema)+str(purpose)
+
 
 def run_migrator(source,target,object_type,ddl,schema,snowflake_credentials,objects,prog_language):
     user_prompt = str(source)+str(target)+str(object_type)+str(ddl)+str(schema)+str('Migrate')+str(prog_language)
@@ -109,7 +113,11 @@ def run_migrator(source,target,object_type,ddl,schema,snowflake_credentials,obje
 
             
 
-    migrator_report = load_ddl_snowflake(schema,migrator_result,snowflake_credentials,objects)
+    if object_type == "TABLE" or object_type == "SCHEMA(Tables only)":
+        migrator_report = load_ddl_data_snowflake(schema,migrator_result,snowflake_credentials,objects, oracle_credentials)
+    else:
+        migrator_report = load_ddl_snowflake(schema,migrator_result,snowflake_credentials,objects)
+        
     st.write("MIGRATOR AGENT REPORT")
     num_loaded = (migrator_report["Status"] == "Loaded").sum()
     num_not_loaded = (migrator_report["Status"] == "Not Loaded").sum()
@@ -125,7 +133,6 @@ def run_migrator(source,target,object_type,ddl,schema,snowflake_credentials,obje
         file_name=f"{source}_{target}_{object_type}_migrator_output.csv",
         mime="text/csv"
     )
-
 def run_analyzer(source,target,object_type,ddl,schema, prog_language):
     try:
         user_prompt = str(source)+str(target)+str(object_type)+str(ddl)+str(schema)+str('Analyze')+str(prog_language)
@@ -188,6 +195,7 @@ def run_analyzer(source,target,object_type,ddl,schema, prog_language):
         traceback.print_exc()
         raise Exception(f"An error occurred while running the crew: {e}")
 
+
 # --------------------------------------------------STREAMLIT PAGE START-------------------------------------------------
 st.title("Agentic G-Migrate")
 
@@ -199,6 +207,11 @@ if "analyze_button_clicked" not in st.session_state:
     st.session_state.analyze_button_clicked = False
 if "migrate_button_clicked" not in st.session_state:
     st.session_state.migrate_button_clicked = False
+
+
+
+
+
 
 col1, col2 = st.columns(2)
 
@@ -378,4 +391,4 @@ if (source == "ORACLE" and st.session_state.analyze_button_clicked == True) or (
             run_analyzer(source,target, st.session_state.object_type_dropdown,ddl,schema,st.session_state.prog_language)
         elif st.session_state.migrate_button_clicked:
             run_migrator(source,target,st.session_state.object_type_dropdown,ddl,schema, snowflake_credentials,objects,st.session_state.prog_language)
-        
+            
