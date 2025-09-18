@@ -71,7 +71,7 @@ class MigrateRequest(BaseModel):
     prog_language: str
     target_creds: SnowflakeCredentials
 
-# Helper functions
+# ------------------------ Helper functions ------------------------
 curr_time = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%Y-%m-%d %H:%M:%S")
 
 def save_ddl_to_file(object_type: str, objects: List[str], ddl: List[str], curr_time: str):
@@ -191,19 +191,7 @@ async def run_analyzer(source: str, target: str, object_type: str, ddl: List[str
         "report": df.to_dict(orient="records"),
     }
 
-# Endpoints
-# @app.post("/test-oracle")
-# async def test_oracle(creds: OracleCredentials):
-#     try:
-#         connection = cx_Oracle.connect(
-#             user=creds.oracle_username,
-#             password=creds.oracle_password,
-#             dsn=creds.oracle_dsn,
-#         )
-#         connection.close()
-#         return {"success": True, "message": "Oracle Connection Successful"}
-#     except Exception as e:
-#         raise HTTPException(status_code=400, detail=f"Oracle Connection failed: {str(e)}")
+# ------------------------ Endpoints ------------------------
 @app.post("/test-oracle")
 async def test_oracle(
     oracle_username: str = Form(...),
@@ -221,22 +209,9 @@ async def test_oracle(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Oracle Connection failed: {str(e)}")
 
-# @app.post("/test-snowflake")
-# async def test_snowflake(creds: SnowflakeCredentials):
-#     try:
-#         conn = connect_snowflake(creds.dict())
-#         curr = conn.cursor()
-#         curr.execute("SELECT CURRENT_WAREHOUSE()")
-#         curr.fetchall()
-#         curr.execute("SELECT CURRENT_VERSION()")
-#         curr.fetchone()
-#         conn.close()
-#         return {"success": True, "message": "Snowflake Connection Successful"}
-#     except Exception as e:
-#         raise HTTPException(status_code=400, detail=f"Snowflake Connection failed: {str(e)}")
 @app.post("/test-snowflake")
 async def test_snowflake(
-    snowflake_user: str = Form(...),
+    snowflake_username: str = Form(...),
     snowflake_password: str = Form(...),
     snowflake_account: str = Form(...),
     snowflake_warehouse: str = Form(...),
@@ -246,13 +221,13 @@ async def test_snowflake(
 ):
     try:
         creds = {
-            "user": snowflake_user,
-            "password": snowflake_password,
-            "account": snowflake_account,
-            "warehouse": snowflake_warehouse,
-            "database": snowflake_database,
-            "schema": snowflake_schema,
-            "role": snowflake_role
+            "snowflake_username": snowflake_username,
+            "snowflake_password": snowflake_password,
+            "snowflake_account_identifier": snowflake_account,
+            "snowflake_warehouse": snowflake_warehouse,
+            "snowflake_database": snowflake_database,
+            "snowflake_schema": snowflake_schema,
+            "snowflake_role": snowflake_role
         }
         conn = connect_snowflake(creds)
         curr = conn.cursor()
@@ -265,35 +240,6 @@ async def test_snowflake(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Snowflake Connection failed: {str(e)}")
     
-# @app.post("/get-objects")
-# async def get_objects(payload: GetObjectsRequest):
-#     try:
-#         connection = connect_oracle(payload.oracle_creds.dict())
-#         cursor = connection.cursor()
-
-#         if payload.object_type == "SCHEMA(Tables only)" or payload.object_type == "TABLE":
-#             cursor.execute(f"SELECT table_name FROM all_tables WHERE owner = '{payload.schema}' ORDER BY table_name")
-#             objects = [row[0] for row in cursor.fetchall()]
-#         elif payload.object_type == "VIEW":
-#             cursor.execute(f"SELECT view_name FROM all_views WHERE owner = '{payload.schema}' ORDER BY view_name")
-#             objects = [row[0] for row in cursor.fetchall()]
-#         elif payload.object_type == "FUNCTION":
-#             cursor.execute(
-#                 f"SELECT object_name FROM all_objects WHERE owner = '{payload.schema}' AND object_type = 'FUNCTION' ORDER BY object_name"
-#             )
-#             objects = [row[0] for row in cursor.fetchall()]
-#         elif payload.object_type == "PROCEDURE":
-#             cursor.execute(
-#                 f"SELECT object_name FROM all_objects WHERE owner = '{payload.schema}' AND object_type = 'PROCEDURE' ORDER BY object_name"
-#             )
-#             objects = [row[0] for row in cursor.fetchall()]
-#         else:
-#             raise HTTPException(status_code=400, detail="Invalid object type")
-
-#         connection.close()
-#         return {"objects": objects}
-#     except Exception as e:
-#         raise HTTPException(status_code=400, detail=f"Failed to fetch objects: {str(e)}")
 @app.post("/get-objects")
 async def get_objects(
     oracle_username: str = Form(...),
@@ -334,23 +280,6 @@ async def get_objects(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to fetch objects: {str(e)}")
 
-
-# @app.post("/extract-ddl")
-# async def extract_ddl(payload: ExtractDDLRequest):
-#     try:
-#         if payload.object_type == "SCHEMA(Tables only)" or payload.object_type == "TABLE":
-#             ddl = getOracleTableDDL(payload.schema, payload.objects, payload.oracle_creds.dict())
-#         elif payload.object_type == "VIEW":
-#             ddl = getOracleViewDDL(payload.schema, payload.objects, payload.oracle_creds.dict())
-#         elif payload.object_type == "FUNCTION":
-#             ddl = getOracleFunctionDDL(payload.schema, payload.objects, payload.oracle_creds.dict())
-#         elif payload.object_type == "PROCEDURE":
-#             ddl = getOracleProcedureDDL(payload.schema, payload.objects, payload.oracle_creds.dict())
-#         else:
-#             raise HTTPException(status_code=400, detail="Invalid object type")
-#         return {"ddl": ddl}
-#     except Exception as e:
-#         raise HTTPException(status_code=400, detail=f"Failed to extract DDL: {str(e)}")
 @app.post("/extract-ddl")
 async def extract_ddl(
     oracle_username: str = Form(...),
@@ -358,13 +287,17 @@ async def extract_ddl(
     oracle_dsn: str = Form(...),
     schema: str = Form(...),
     object_type: str = Form(...),
-    objects: List[str] = Form(...)
+    objects_raw: str = Form(...)  # Accept comma-separated string
 ):
     try:
+        # Convert comma-separated string to list
+        objects = [obj.strip().upper() for obj in objects_raw.split(",")]
+        schema = schema.upper()
+
         creds = {
-            "user": oracle_username,
-            "password": oracle_password,
-            "dsn": oracle_dsn
+            "oracle_username": oracle_username,
+            "oracle_password": oracle_password,
+            "oracle_dsn": oracle_dsn
         }
 
         if object_type == "SCHEMA(Tables only)" or object_type == "TABLE":
@@ -382,20 +315,6 @@ async def extract_ddl(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to extract DDL: {str(e)}")
 
-# @app.post("/analyze")
-# async def analyze(payload: AnalyzeRequest):
-#     try:
-#         result = await run_analyzer(
-#             source=payload.source,
-#             target=payload.target,
-#             object_type=payload.object_type,
-#             ddl=payload.ddl,
-#             schema=payload.schema,
-#             prog_language=payload.prog_language,
-#         )
-#         return result
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Analyzer failed: {str(e)}")
 @app.post("/analyze")
 async def analyze(
     source: str = Form(...),
@@ -418,23 +337,6 @@ async def analyze(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analyzer failed: {str(e)}")
 
-
-# @app.post("/migrate")
-# async def migrate(payload: MigrateRequest):
-#     try:
-#         result = await run_migrator(
-#             source=payload.source,
-#             target=payload.target,
-#             object_type=payload.object_type,
-#             ddl=payload.ddl,
-#             schema=payload.schema,
-#             snowflake_credentials=payload.target_creds.dict(),
-#             objects=payload.objects,
-#             prog_language=payload.prog_language,
-#         )
-#         return result
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Migrator failed: {str(e)}")
 @app.post("/migrate")
 async def migrate(
     source: str = Form(...),
